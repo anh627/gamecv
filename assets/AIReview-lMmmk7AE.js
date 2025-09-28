@@ -1,0 +1,1 @@
+import{j as e}from"./index-C3orcBTn.js";const s=()=>e.jsxs("div",{children:[e.jsx("h2",{children:"Phân tích AI (Demo)"}),e.jsx("p",{children:"Module này sẽ tích hợp engine AI hoặc review chuyên sâu."})]});export{s as default};
