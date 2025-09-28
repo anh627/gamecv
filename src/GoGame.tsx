@@ -3,11 +3,12 @@ import { produce } from 'immer';
 import { useTimer } from 'react-timer-hook';
 
 // ---- Types & Constants ----
-enum Stone {
-  EMPTY = 0,
-  BLACK = 1,
-  WHITE = 2
-}
+const Stone = {
+  EMPTY: 0,
+  BLACK: 1,
+  WHITE: 2
+} as const;
+type StoneType = typeof Stone[keyof typeof Stone];
 
 type GameMode = 'ai' | 'local' | 'online';
 type Difficulty = 'easy' | 'medium' | 'hard';
@@ -20,12 +21,12 @@ interface Position {
 }
 
 interface GameMove {
-  player: Stone;
+  player: StoneType;
   position: Position;
   timestamp: number;
   captures: number;
   isPass?: boolean;
-  boardState: Stone[][];
+  boardState: StoneType[][];
 }
 
 interface Captures {
@@ -51,15 +52,7 @@ interface GameSettings {
   humanColor: PlayerColor;
 }
 
-interface SGFGame {
-  moves: string;
-  boardSize: number;
-  komi: number;
-  result?: string;
-  playerBlack?: string;
-  playerWhite?: string;
-  date?: string;
-}
+
 
 // MCTS Node for AI
 interface MCTSNode {
@@ -69,7 +62,7 @@ interface MCTSNode {
   children: MCTSNode[];
   parent: MCTSNode | null;
   untriedMoves: Position[];
-  playerToMove: Stone;
+  playerToMove: StoneType;
 }
 
 // Constants
@@ -116,8 +109,8 @@ const TUTORIAL_MESSAGES = {
 };
 
 // ---- Utility Functions ----
-function makeEmptyBoard(size: number): Stone[][] {
-  return Array.from({ length: size }, () => Array<Stone>(size).fill(Stone.EMPTY));
+function makeEmptyBoard(size: number): StoneType[][] {
+  return Array.from({ length: size }, () => Array<StoneType>(size).fill(Stone.EMPTY));
 }
 
 function inBounds(x: number, y: number, size: number): boolean {
@@ -131,7 +124,7 @@ function getNeighbors(x: number, y: number, size: number): Position[] {
     .filter(pos => inBounds(pos.x, pos.y, size));
 }
 
-function getGroupAndLiberties(board: Stone[][], x: number, y: number): { 
+function getGroupAndLiberties(board: StoneType[][], x: number, y: number): { 
   group: Position[]; 
   liberties: Set<string> 
 } {
@@ -166,14 +159,14 @@ function getGroupAndLiberties(board: Stone[][], x: number, y: number): {
 }
 
 function tryPlay(
-  board: Stone[][], 
+  board: StoneType[][], 
   x: number, 
   y: number, 
-  color: Stone,
-  koBoard: Stone[][] | null
+  color: StoneType,
+  koBoard: StoneType[][] | null
 ): { 
   legal: boolean; 
-  board?: Stone[][]; 
+  board?: StoneType[][]; 
   captures?: number;
   capturedPositions?: Position[];
 } {
@@ -185,7 +178,7 @@ function tryPlay(
     draft[y][x] = color;
   });
 
-  const opponent: Stone = color === Stone.BLACK ? Stone.WHITE : Stone.BLACK;
+  const opponent: StoneType = color === Stone.BLACK ? Stone.WHITE : Stone.BLACK;
   let totalCaptures = 0;
   const capturedPositions: Position[] = [];
 
@@ -252,7 +245,7 @@ class MCTSEngine {
     }
   }
 
-  selectMove(board: Stone[][], color: Stone, koBoard: Stone[][] | null): Position | null {
+  selectMove(board: StoneType[][], color: StoneType, koBoard: StoneType[][] | null): Position | null {
     const root = this.createNode(null, null, color, board);
     
     for (let i = 0; i < this.maxSimulations; i++) {
@@ -276,10 +269,10 @@ class MCTSEngine {
   }
 
   private createNode(
-    parent: MCTSNode | null,
-    position: Position | null,
-    playerToMove: Stone,
-    board: Stone[][]
+  parent: MCTSNode | null,
+  position: Position | null,
+  playerToMove: StoneType,
+  board: StoneType[][]
   ): MCTSNode {
     const untriedMoves = this.getPossibleMoves(board, playerToMove);
     return {
@@ -293,7 +286,7 @@ class MCTSEngine {
     };
   }
 
-  private getPossibleMoves(board: Stone[][], color: Stone): Position[] {
+  private getPossibleMoves(board: StoneType[][], color: StoneType): Position[] {
     const moves: Position[] = [];
     const size = board.length;
 
@@ -311,7 +304,7 @@ class MCTSEngine {
     return moves;
   }
 
-  private select(node: MCTSNode, board: Stone[][], koBoard: Stone[][] | null): MCTSNode {
+  private select(node: MCTSNode, board: StoneType[][], koBoard: StoneType[][] | null): MCTSNode {
     let current = node;
     let currentBoard = [...board.map(row => [...row])];
 
@@ -358,7 +351,7 @@ class MCTSEngine {
     return bestChild!;
   }
 
-  private simulate(node: MCTSNode, board: Stone[][], originalColor: Stone, koBoard: Stone[][] | null): number {
+  private simulate(node: MCTSNode, board: StoneType[][], originalColor: StoneType, koBoard: StoneType[][] | null): number {
     let simulationBoard = [...board.map(row => [...row])];
     let currentPlayer = node.playerToMove;
     let passes = 0;
@@ -386,7 +379,7 @@ class MCTSEngine {
     return score > 0 ? 1 : 0;
   }
 
-  private evaluateBoard(board: Stone[][], color: Stone): number {
+  private evaluateBoard(board: StoneType[][], color: StoneType): number {
     let myStones = 0;
     let oppStones = 0;
     const opponent = color === Stone.BLACK ? Stone.WHITE : Stone.BLACK;
@@ -412,7 +405,7 @@ class MCTSEngine {
 }
 
 // ---- Optimized AI with fallback ----
-function getRelevantPositions(board: Stone[][], maxDistance: number = 2): Position[] {
+function getRelevantPositions(board: StoneType[][], maxDistance: number = 2): Position[] {
   const size = board.length;
   const relevantPositions = new Set<string>();
 
@@ -449,12 +442,12 @@ function getRelevantPositions(board: Stone[][], maxDistance: number = 2): Positi
 }
 
 function calculateMoveScore(
-  board: Stone[][], 
-  x: number, 
-  y: number, 
-  color: Stone, 
+  board: StoneType[][],
+  x: number,
+  y: number,
+  color: StoneType,
   difficulty: Difficulty,
-  koBoard: Stone[][] | null
+  koBoard: StoneType[][] | null
 ): number {
   const size = board.length;
   let score = 0;
@@ -494,10 +487,10 @@ function calculateMoveScore(
 }
 
 function pickAiMove(
-  board: Stone[][], 
-  color: Stone, 
+  board: StoneType[][],
+  color: StoneType,
   difficulty: Difficulty,
-  koBoard: Stone[][] | null
+  koBoard: StoneType[][] | null
 ): Position | null {
   // Use MCTS for hard difficulty
   if (difficulty === 'hard') {
@@ -531,7 +524,7 @@ function pickAiMove(
 }
 
 // ---- Enhanced SGF Functions ----
-function positionToSGF(pos: Position, boardSize: number): string {
+function positionToSGF(pos: Position): string {
   if (pos.x === -1 && pos.y === -1) return '';
   const x = String.fromCharCode(97 + pos.x);
   const y = String.fromCharCode(97 + pos.y);
@@ -562,7 +555,7 @@ function exportToSGF(
 
   for (const move of moves) {
     const color = move.player === Stone.BLACK ? 'B' : 'W';
-    const coord = positionToSGF(move.position, settings.boardSize);
+  const coord = positionToSGF(move.position);
     sgf += ';' + color + '[' + coord + ']';
   }
 
@@ -571,7 +564,7 @@ function exportToSGF(
 }
 
 function importFromSGF(sgfContent: string): { 
-  moves: { position: Position; player: Stone }[]; 
+  moves: { position: Position; player: StoneType }[];
   boardSize: number; 
   komi: number 
 } | null {
@@ -580,19 +573,16 @@ function importFromSGF(sgfContent: string): {
     const content = sgfContent.replace(/\s+/g, ' ').trim();
     
     // Parse board size
-    const sizeMatch = content.match(/SZ```math
-(\d+)```/);
+    const sizeMatch = content.match(/SZ\[(\d+)\]/);
     const boardSize = sizeMatch ? parseInt(sizeMatch[1]) : 19;
 
     // Parse komi
-    const komiMatch = content.match(/KM```math
-([0-9.-]+)```/);
+    const komiMatch = content.match(/KM\[([0-9.-]+)\]/);
     const komi = komiMatch ? parseFloat(komiMatch[1]) : 6.5;
 
     // Parse moves
-    const moves: { position: Position; player: Stone }[] = [];
-    const movePattern = /;([BW])```math
-([a-s]{0,2})```/g;
+  const moves: { position: Position; player: StoneType }[] = [];
+    const movePattern = /;([BW])\[([a-s]{0,2})\]/g;
     let match;
 
     while ((match = movePattern.exec(content)) !== null) {
@@ -615,7 +605,7 @@ const StoneComponent = React.memo(({
   isLastMove = false,
   isAnimating = false 
 }: { 
-  color: Stone;
+  color: StoneType;
   size?: 'small' | 'medium' | 'large';
   isLastMove?: boolean;
   isAnimating?: boolean;
@@ -655,7 +645,6 @@ const StoneComponent = React.memo(({
 const BoardCell = React.memo(({
   position,
   stone,
-  boardSize,
   cellSize,
   isHovered,
   isValidMove,
@@ -663,10 +652,11 @@ const BoardCell = React.memo(({
   isLastMove,
   onHover,
   onClick,
-  currentPlayer
+  currentPlayer,
+  isAnimating
 }: {
   position: Position;
-  stone: Stone;
+  stone: StoneType;
   boardSize: number;
   cellSize: number;
   isHovered: boolean;
@@ -675,7 +665,8 @@ const BoardCell = React.memo(({
   isLastMove: boolean;
   onHover: (position: Position | null) => void;
   onClick: (position: Position) => void;
-  currentPlayer: Stone;
+  currentPlayer: StoneType;
+  isAnimating: boolean;
 }) => {
   const { x, y } = position;
 
@@ -707,7 +698,7 @@ const BoardCell = React.memo(({
       )}
 
       {stone !== Stone.EMPTY && (
-        <div className="absolute z-30">
+        <div className={`absolute z-30 ${isAnimating ? 'animate-pulse scale-110' : ''}`}>
           <StoneComponent color={stone} isLastMove={isLastMove} />
         </div>
       )}
@@ -731,7 +722,6 @@ const TimerDisplay = ({
     minutes,
     pause,
     resume,
-    restart
   } = useTimer({ 
     expiryTimestamp, 
     onExpire,
@@ -784,10 +774,13 @@ const Tooltip = ({
 
 // ---- Main Game Component ----
 const GoGame = () => {
+  // Hiệu ứng bắt quân: khai báo lại state
+  const [animatingCaptures, setAnimatingCaptures] = useState<Position[]>([]);
+  // Khôi phục khai báo animatingCaptures
   const [gameMode, setGameMode] = useState<GameMode>('local');
   const [settings, setSettings] = useState<GameSettings>(DEFAULT_SETTINGS);
-  const [board, setBoard] = useState<Stone[][]>(() => makeEmptyBoard(settings.boardSize));
-  const [currentPlayer, setCurrentPlayer] = useState<Stone>(Stone.BLACK);
+  const [board, setBoard] = useState<StoneType[][]>(() => makeEmptyBoard(settings.boardSize));
+  const [currentPlayer, setCurrentPlayer] = useState<StoneType>(Stone.BLACK);
   const [captures, setCaptures] = useState<Captures>({ black: 0, white: 0 });
   const [moveHistory, setMoveHistory] = useState<GameMove[]>([]);
   const [gameStatus, setGameStatus] = useState<GameStatus>('playing');
@@ -796,15 +789,29 @@ const GoGame = () => {
   const [lastMove, setLastMove] = useState<Position | null>(null);
   const [showScore, setShowScore] = useState(false);
   const [gameScore, setGameScore] = useState<GameScore | null>(null);
-  const [animatingCaptures, setAnimatingCaptures] = useState<Position[]>([]);
+  // Timer cho mỗi lượt chơi
+  const [timerExpiry, setTimerExpiry] = useState<Date>(() => {
+    const now = new Date();
+    now.setSeconds(now.getSeconds() + settings.timePerMove);
+    return now;
+  });
+  const [isTimerActive, setIsTimerActive] = useState(true);
+
+  useEffect(() => {
+    // Reset timer mỗi khi đổi lượt
+    const now = new Date();
+    now.setSeconds(now.getSeconds() + settings.timePerMove);
+    setTimerExpiry(now);
+    setIsTimerActive(true);
+  }, [currentPlayer, settings.timePerMove]);
   const [showTutorial, setShowTutorial] = useState(false);
   const [isLoadingAI, setIsLoadingAI] = useState(false);
 
-  const koHistoryRef = useRef<Stone[][] | null>(null);
-  const aiMoveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const koHistoryRef = useRef<StoneType[][] | null>(null);
+  const aiMoveTimeoutRef = useRef<number | null>(null);
   const animationFrameRef = useRef<number | null>(null);
 
-  const getAIColor = useCallback((): Stone => {
+  const getAIColor = useCallback((): StoneType => {
     return settings.humanColor === 'black' ? Stone.WHITE : Stone.BLACK;
   }, [settings.humanColor]);
 
@@ -868,7 +875,7 @@ const GoGame = () => {
 
     const floodFill = (startX: number, startY: number): { 
       points: Position[]; 
-      owner: Stone;
+  owner: StoneType;
       isSeki: boolean;
     } => {
       if (visited.has(`${startX},${startY}`) || board[startY][startX] !== Stone.EMPTY) {
@@ -877,7 +884,7 @@ const GoGame = () => {
 
       const queue: Position[] = [{ x: startX, y: startY }];
       const territory: Position[] = [];
-      const borderStones = new Set<Stone>();
+  const borderStones = new Set<StoneType>();
       const borderGroups = new Set<string>();
 
       while (queue.length > 0) {
@@ -899,7 +906,7 @@ const GoGame = () => {
         }
       }
 
-      let owner: Stone = Stone.EMPTY;
+  let owner: StoneType = Stone.EMPTY;
       let isSeki = false;
       
       if (borderStones.size === 2 && borderGroups.size === 2) {
@@ -1010,11 +1017,11 @@ const GoGame = () => {
       position,
       timestamp: Date.now(),
       captures: result.captures || 0,
-      boardState: produce(result.board, draft => {})
+      boardState: produce(result.board, draft => draft)
     };
     setMoveHistory(prev => [...prev, newMove]);
 
-    const nextPlayer: Stone = currentPlayer === Stone.BLACK ? Stone.WHITE : Stone.BLACK;
+  const nextPlayer: StoneType = currentPlayer === Stone.BLACK ? Stone.WHITE : Stone.BLACK;
     setCurrentPlayer(nextPlayer);
     setPassCount(0);
 
@@ -1038,7 +1045,7 @@ const GoGame = () => {
       timestamp: Date.now(),
       captures: 0,
       isPass: true,
-      boardState: produce(board, draft => {})
+      boardState: produce(board, draft => draft)
     };
     setMoveHistory(prev => [...prev, passMove]);
 
@@ -1048,7 +1055,7 @@ const GoGame = () => {
       setGameScore(finalScore);
       setShowScore(true);
     } else {
-      const nextPlayer: Stone = currentPlayer === Stone.BLACK ? Stone.WHITE : Stone.BLACK;
+  const nextPlayer: StoneType = currentPlayer === Stone.BLACK ? Stone.WHITE : Stone.BLACK;
       setCurrentPlayer(nextPlayer);
 
       if (gameMode === 'ai' && nextPlayer === getAIColor()) {
@@ -1159,7 +1166,7 @@ const GoGame = () => {
         // Replay moves
         let currentBoard = newBoard;
         let currentCaptures = { black: 0, white: 0 };
-        let koBoard: Stone[][] | null = null;
+  let koBoard: StoneType[][] | null = null;
         const newMoveHistory: GameMove[] = [];
 
         for (const move of gameData.moves) {
@@ -1171,7 +1178,7 @@ const GoGame = () => {
               timestamp: Date.now(),
               captures: 0,
               isPass: true,
-              boardState: produce(currentBoard, draft => {})
+              boardState: produce(currentBoard, draft => draft)
             };
             newMoveHistory.push(passMove);
           } else {
@@ -1204,7 +1211,7 @@ const GoGame = () => {
               position: move.position,
               timestamp: Date.now(),
               captures: result.captures || 0,
-              boardState: produce(currentBoard, draft => {})
+              boardState: produce(currentBoard, draft => draft)
             };
             newMoveHistory.push(gameMove);
           }
@@ -1343,7 +1350,7 @@ const GoGame = () => {
           row.map((stone, x) => {
             const isStarPoint = starPoints.some(point => point.x === x && point.y === y);
             const isLastMovePosition = lastMove?.x === x && lastMove?.y === y;
-            
+            const isAnimating = animatingCaptures.some(pos => pos.x === x && pos.y === y);
             return (
               <BoardCell
                 key={`cell-${x}-${y}`}
@@ -1358,6 +1365,7 @@ const GoGame = () => {
                 onHover={setHoverPosition}
                 onClick={handlePlaceStone}
                 currentPlayer={currentPlayer}
+                isAnimating={isAnimating}
               />
             );
           })
@@ -1576,6 +1584,15 @@ const GoGame = () => {
 
             <div className="flex-1 order-1 lg:order-2">
               <div className="flex justify-center mb-2 xs:mb-4 sm:mb-6">
+    <div className="mb-2 text-sm text-gray-700 font-semibold">
+      Kích thước bàn cờ: {settings.boardSize}x{settings.boardSize}
+    </div>
+                <TimerDisplay
+                  expiryTimestamp={timerExpiry}
+                  onExpire={() => setIsTimerActive(false)}
+                  isActive={isTimerActive}
+                  color={currentPlayer === Stone.BLACK ? 'black' : 'white'}
+                />
                 {renderBoard}
               </div>
 
